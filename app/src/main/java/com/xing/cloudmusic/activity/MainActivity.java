@@ -1,9 +1,15 @@
 package com.xing.cloudmusic.activity;
 
 import android.annotation.SuppressLint;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
@@ -17,6 +23,7 @@ import com.xing.cloudmusic.base.DataAndCode;
 import com.xing.cloudmusic.base.ResultAndCode;
 import com.xing.cloudmusic.base.Song;
 import com.xing.cloudmusic.http.CloudMusicApiImpl;
+import com.xing.cloudmusic.service.MusicPlayService;
 import com.xing.cloudmusic.util.LogUtil;
 import com.xing.cloudmusic.util.ToastFactory;
 
@@ -33,7 +40,9 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class MainActivity extends AppCompatActivity implements AdapterView.OnItemClickListener {
+import static android.os.Looper.prepare;
+
+public class MainActivity extends AppCompatActivity implements AdapterView.OnItemClickListener, ServiceConnection {
     private EditText s;
     private ListView show;
 
@@ -43,13 +52,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private static final int SEARCHID_BACK = 10001;
     private static final int DOWNLOADMUSIC = 10002;
 
+    private MusicPlayService.Binder mBinder;
+    private Intent musicPlayService;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         s = findViewById(R.id.editText);
         show = findViewById(R.id.listView);
-        //show.setAdapter(adapter);
         show.setOnItemClickListener(this);
     }
 
@@ -86,10 +97,20 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }
     };
 
+    public void bind(View view){
+        LogUtil.LogE("bind click1");
+        musicPlayService = new Intent(MainActivity.this,MusicPlayService.class);
+        startService(musicPlayService);
+        bindService(musicPlayService,this, Context.BIND_AUTO_CREATE);
+        LogUtil.LogE("bind click2");
+    }
+
     public void search(View view){
-        LogUtil.LogE("search begin");
-        searchS(s.getText().toString());
-        LogUtil.LogE("search end");
+//        LogUtil.LogE("search begin");
+//        searchS(s.getText().toString());
+//        LogUtil.LogE("search end");
+        if(mBinder != null) mBinder.setAction(MusicPlayService.ACTION_PLAY,Environment.getExternalStorageDirectory()+"/怪不得.mp3");
+        LogUtil.LogE("search " + (mBinder ==null?"null":" not null"));
     }
 
     private void searchS(String s){
@@ -172,5 +193,23 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
         Song song = (Song)show.getItemAtPosition(position);
         searchID(song.getId());
+    }
+
+    @Override
+    protected void onDestroy() {
+        unbindService(this);
+        stopService(musicPlayService);
+        super.onDestroy();
+    }
+
+    @Override
+    public void onServiceConnected(ComponentName name, IBinder service) {
+        mBinder = (MusicPlayService.Binder) service;
+        LogUtil.LogE("bind success");
+    }
+
+    @Override
+    public void onServiceDisconnected(ComponentName name) {
+         LogUtil.LogE("bind fail");
     }
 }

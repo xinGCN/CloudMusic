@@ -9,6 +9,10 @@
         android:id="@+id/editText"/>
 
     <Button
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:onClick="bind"/>
+    <Button
         android:onClick="search"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
