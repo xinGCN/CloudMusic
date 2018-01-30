@@ -17,7 +17,7 @@ import retrofit2.http.Url;
 public interface CloudMusicApi {
     //查询某个关键词对应的一些数据
     @GET("cloudmusic/")
-    Call<ResultAndCode> searchS(@Query("s")String s , @Query("search_type")int searchType, @Query("type")String type,@Query("limit")int limit);
+    Call<ResultAndCode> searchS(@Query("s")String s , @Query("search_type")int searchType, @Query("type")String type);
 
     //根据id查询Id对应的文件
     @GET("cloudmusic/")

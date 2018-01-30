@@ -64,6 +64,21 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         show.setOnItemClickListener(this);
     }
 
+
+    @Override
+    protected void onStart() {
+        LogUtil.LogE("MainActivity onStart musicPlayService start");
+        initMusicPlayService();
+        super.onStart();
+    }
+
+    //初始化服务和绑定
+    private void initMusicPlayService() {
+        musicPlayService = new Intent(MainActivity.this,MusicPlayService.class);
+        startService(musicPlayService);
+        bindService(musicPlayService,this, Context.BIND_AUTO_CREATE);
+    }
+
     @SuppressLint("HandlerLeak")
     private final Handler mHandler  = new Handler(){
         @Override
@@ -81,14 +96,18 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 case SEARCHID_BACK:
                     LogUtil.LogE("handler SEARCHID_BACK");
                     DataAndCode adc = (DataAndCode) msg.obj;
-                    String name=null;
-                    for(int i = 0 ; i < adapter.getCount() ;i++){
-                        if(adc.getDataId().equals(((Song)adapter.getItem(i)).getId())){
-                            name = ((Song)adapter.getItem(i)).getName();
-                            break;
-                        }
-                    }
-                    downloadFile(adc.getDataUrl(),name+"."+adc.getDataType());
+//                    String name=null;
+//                    for(int i = 0 ; i < adapter.getCount() ;i++){
+//                        if(adc.getDataId().equals(((Song)adapter.getItem(i)).getId())){
+//                            name = ((Song)adapter.getItem(i)).getName();
+//                            break;
+//                        }
+//                    }
+                    //downloadFile(adc.getDataUrl(),name+"."+adc.getDataType());
+                    if(musicPlayService != null)
+                        mBinder.setAction(MusicPlayService.ACTION_PLAY,adc.getDataUrl());
+                    else
+                        LogUtil.LogE("musicPlayService is null");
                     break;
                 case DOWNLOADMUSIC:
                     ToastFactory.show(MainActivity.this,"Download Finish!");
@@ -97,22 +116,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }
     };
 
-    public void bind(View view){
-        LogUtil.LogE("bind click1");
-        musicPlayService = new Intent(MainActivity.this,MusicPlayService.class);
-        startService(musicPlayService);
-        bindService(musicPlayService,this, Context.BIND_AUTO_CREATE);
-        LogUtil.LogE("bind click2");
-    }
-
     public void search(View view){
-//        LogUtil.LogE("search begin");
-//        searchS(s.getText().toString());
-//        LogUtil.LogE("search end");
-        if(mBinder != null) mBinder.setAction(MusicPlayService.ACTION_PLAY,Environment.getExternalStorageDirectory()+"/怪不得.mp3");
-        LogUtil.LogE("search " + (mBinder ==null?"null":" not null"));
+        LogUtil.LogE("search begin");
+        searchS(s.getText().toString());
+        LogUtil.LogE("search end");
+//        if(mBinder != null) mBinder.setAction(MusicPlayService.ACTION_PLAY,Environment.getExternalStorageDirectory()+"/怪不得.mp3");
+//        LogUtil.LogE("search " + (mBinder ==null?"null":" not null"));
     }
 
+    //查询某个歌曲的信息，最重要为id信息
     private void searchS(String s){
         LogUtil.LogE("searchS begin");
         Call<ResultAndCode> call = CloudMusicApiImpl.searchS(s);
@@ -131,6 +143,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         LogUtil.LogE("searchS end");
     }
 
+    //查询某个id的歌曲，最重要为获得歌曲地址
     private void searchID(String id){
         LogUtil.LogE("searchID begin");
         Call<DataAndCode> call = CloudMusicApiImpl.searchID(id);
@@ -193,6 +206,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
         Song song = (Song)show.getItemAtPosition(position);
         searchID(song.getId());
+
+        if(musicPlayService != null)
+            mBinder.setAction(MusicPlayService.ACTION_PLAY,"");
     }
 
     @Override
@@ -202,6 +218,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         super.onDestroy();
     }
 
+    //当服务连接上时启用,功能为初始化通信用binder
     @Override
     public void onServiceConnected(ComponentName name, IBinder service) {
         mBinder = (MusicPlayService.Binder) service;

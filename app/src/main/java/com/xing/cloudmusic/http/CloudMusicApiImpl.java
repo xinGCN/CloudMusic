@@ -21,7 +21,7 @@ public class CloudMusicApiImpl {
         if(service == null) service = retrofit.create(CloudMusicApi.class);
 
 
-        Call<ResultAndCode> call = service.searchS(s,1,"search",5);
+        Call<ResultAndCode> call = service.searchS(s,1,"search");
         return call;
     }
 
