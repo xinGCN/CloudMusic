@@ -2,10 +2,13 @@ package com.xing.cloudmusic.activity;
 
 import android.annotation.SuppressLint;
 import android.content.ComponentName;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.database.Cursor;
 import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -14,9 +17,13 @@ import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.ListView;
+import android.widget.TextView;
 
+import com.squareup.picasso.Picasso;
 import com.xing.cloudmusic.R;
 import com.xing.cloudmusic.adapter.CmAdapter;
 import com.xing.cloudmusic.base.DataAndCode;
@@ -33,6 +40,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.List;
 
 import okhttp3.ResponseBody;
@@ -41,16 +49,22 @@ import retrofit2.Callback;
 import retrofit2.Response;
 
 import static android.os.Looper.prepare;
+import static com.xing.cloudmusic.R.mipmap.pause_btn;
 
 public class MainActivity extends AppCompatActivity implements AdapterView.OnItemClickListener, ServiceConnection {
     private EditText s;
     private ListView show;
+    private Button playAndPause;
 
     private CmAdapter adapter;
+    private ImageView bottomImage;
+    private TextView bottmText1;
+    private TextView bottmText2;
 
     private static final int SEARCHS_BACK = 10000;
     private static final int SEARCHID_BACK = 10001;
     private static final int DOWNLOADMUSIC = 10002;
+    public static final int UPDATE_BOTTOM = 10003;
 
     private MusicPlayService.Binder mBinder;
     private Intent musicPlayService;
@@ -58,10 +72,14 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.havetry);
         s = findViewById(R.id.editText);
         show = findViewById(R.id.listView);
         show.setOnItemClickListener(this);
+        playAndPause = findViewById(R.id.playAndPause);
+        bottomImage = findViewById(R.id.bottom_image);
+        bottmText1 = findViewById(R.id.bottom_text1);
+        bottmText2 = findViewById(R.id.bottom_text2);
     }
 
 
@@ -86,31 +104,25 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             switch (msg.what){
                 case SEARCHS_BACK:
                     LogUtil.LogE("handler SEARCHS_BACK");
-                    //List<String> ids = ((ResultAndCode) (msg.obj)).getID();
                     adapter = new CmAdapter(MainActivity.this,(ResultAndCode) msg.obj);
                     show.setAdapter(adapter);
-                    //show.setAdapter(adapter);
-                    //LogUtil.LogE("handler SEARCHS_BACK : ");
-                    //searchID(ids.get(0));
                     break;
                 case SEARCHID_BACK:
                     LogUtil.LogE("handler SEARCHID_BACK");
                     DataAndCode adc = (DataAndCode) msg.obj;
-//                    String name=null;
-//                    for(int i = 0 ; i < adapter.getCount() ;i++){
-//                        if(adc.getDataId().equals(((Song)adapter.getItem(i)).getId())){
-//                            name = ((Song)adapter.getItem(i)).getName();
-//                            break;
-//                        }
-//                    }
-                    //downloadFile(adc.getDataUrl(),name+"."+adc.getDataType());
-                    if(musicPlayService != null)
-                        mBinder.setAction(MusicPlayService.ACTION_PLAY,adc.getDataUrl());
-                    else
-                        LogUtil.LogE("musicPlayService is null");
+                    mBinder.setAction(MusicPlayService.ACTION_PLAY,adc.getDataUrl());
                     break;
                 case DOWNLOADMUSIC:
                     ToastFactory.show(MainActivity.this,"Download Finish!");
+                    break;
+                case UPDATE_BOTTOM:
+                    playAndPause.setBackgroundResource(R.mipmap.pause_btn);
+                    Song song = (Song) msg.obj;
+                    Picasso.with(MainActivity.this)
+                            .load(song.getAlbumPicUrl())
+                            .into(bottomImage);
+                    bottmText1.setText(song.getName());
+                    bottmText2.setText(song.getArtistName());
                     break;
             }
         }
@@ -205,10 +217,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     @Override
     public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
         Song song = (Song)show.getItemAtPosition(position);
-        searchID(song.getId());
-
-        if(musicPlayService != null)
-            mBinder.setAction(MusicPlayService.ACTION_PLAY,"");
+        mBinder.setAction(MusicPlayService.PLAYLIST_ADD,song);
+        mBinder.setAction(MusicPlayService.ACTION_PLAY,null);
     }
 
     @Override
@@ -222,6 +232,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     @Override
     public void onServiceConnected(ComponentName name, IBinder service) {
         mBinder = (MusicPlayService.Binder) service;
+        mBinder.setHandler(mHandler);
         LogUtil.LogE("bind success");
     }
 
@@ -229,4 +240,35 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     public void onServiceDisconnected(ComponentName name) {
          LogUtil.LogE("bind fail");
     }
+
+    public void test(View view){
+        ContentResolver contentResolver = getContentResolver();
+        Uri uri = android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
+        Cursor cursor = contentResolver.query(uri, null, null, null, null);
+        if (cursor == null) {
+            // query failed, handle error.
+        } else if (!cursor.moveToFirst()) {
+            // no media on the device
+        } else {
+            int titleColumn = cursor.getColumnIndex(android.provider.MediaStore.Audio.Media.TITLE);
+            int idColumn = cursor.getColumnIndex(android.provider.MediaStore.Audio.Media._ID);
+            do {
+                long thisId = cursor.getLong(idColumn);
+                String thisTitle = cursor.getString(titleColumn);
+                // ...process entry...
+                LogUtil.LogE(thisId + " " + thisTitle);
+            } while (cursor.moveToNext());
+        }
+    }
+
+    public void playAndPause(View view){
+        if(mBinder.getService().isPlaying()){
+            mBinder.setAction(MusicPlayService.ACTION_PAUSE,null);
+            playAndPause.setBackgroundResource(R.mipmap.play_btn);
+        }else{
+            mBinder.setAction(MusicPlayService.ACTION_PLAY_FROMPAUSE,null);
+            playAndPause.setBackgroundResource(R.mipmap.pause_btn);
+        }
+    }
+
 }

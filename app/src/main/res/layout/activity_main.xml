@@ -9,14 +9,27 @@
         android:id="@+id/editText"/>
 
     <Button
+        android:onClick="test"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Debug" />
+
+    <Button
         android:onClick="search"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Button" />
 
     <ListView
+        android:id="@+id/listView"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:id="@+id/listView">
+        android:layout_height="wrap_content">
     </ListView>
+
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="nihao"/>
+
 </LinearLayout>

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+    <RelativeLayout
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"   >
+        <LinearLayout android:id="@+id/top"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"  >
+            <EditText android:id="@+id/view_user_input"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dip"
+                android:layout_marginLeft="12dip"
+                android:singleLine="true"
+                android:numeric="integer"
+                android:imeOptions="actionDone"
+                android:hint="输入用户ID"
+                android:layout_weight="1"/>
+            <Button android:id="@+id/view_user"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dip"
+                android:layout_weight="3"
+                android:text="查看"/>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/center"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_above="@id/bottom"
+            android:layout_below="@id/top" >
+            <TextView android:id="@+id/my_friends_list"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:text="好友列表"
+                android:paddingTop="6dip"
+                android:paddingLeft="2dip"
+                android:layout_marginLeft="10dip"/>
+            <ListView android:id="@+id/friends"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="6dip"/>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/bottom"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_alignParentBottom="true"  >
+            <Button android:id="@+id/refresh"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dip"
+                android:text="刷新用户列表"
+                android:layout_weight="1"/>
+            <Button android:id="@+id/back"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dip"
+                android:text="返回"
+                android:layout_weight="1"/>
+        </LinearLayout>
+    </RelativeLayout>
+</LinearLayout>
