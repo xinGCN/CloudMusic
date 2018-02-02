@@ -35,6 +35,8 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
     public static final int PLAYLIST_ADD = 20003;
     public static final int PLAYLIST_DELETE = 20004;
     public static final int ACTION_PLAY_FROMPAUSE = 20005;
+    public static final int ACTION_NEXT = 20006;
+    public static final int ACTION_LAST = 20007;
 
     private MediaPlayer mPlayer;
     private List<Song> playList;
@@ -71,7 +73,7 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
         wifiLock.acquire();
 
         playList = new ArrayList<>();
-        playingSong = 0;
+        playingSong = -1;
         LogUtil.LogE("MusicPlayService onCreate end");
     }
 
@@ -105,14 +107,14 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
     @Override
     public void onCompletion(MediaPlayer mp) {
         if(playingSong == playList.size() - 1)  playingSong = 0;
-        searchForPlay(playList.get(playingSong).getId());
+        searchForPlay();
     }
 
     public class Binder extends android.os.Binder{
         public void setAction(int action,Object obj){
             switch (action){
                 case ACTION_PLAY:
-                    searchForPlay(playList.get(playingSong).getId());
+                    searchForPlay();
                     break;
                 case ACTION_PAUSE:
                     if(mPlayer.isPlaying()) mPlayer.pause();
@@ -123,6 +125,18 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
                     break;
                 case ACTION_PLAY_FROMPAUSE:
                     mPlayer.start();
+                    break;
+                case ACTION_NEXT:
+                    if(playingSong != -1){
+                        playingSong = playingSong==playList.size()-1?0:playingSong+1;
+                        searchForPlay();
+                    }
+                    break;
+                case ACTION_LAST:
+                    if(playingSong != -1){
+                        playingSong = playingSong==0?playList.size()-0:playingSong-1;
+                        searchForPlay();
+                    }
                     break;
             }
         }
@@ -137,9 +151,11 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
     }
 
     //查询某个id的歌曲，最重要为获得歌曲地址
-    private void searchForPlay(String id){
+    private void searchForPlay(){
         LogUtil.LogE("searchID begin");
-        Call<DataAndCode> call = CloudMusicApiImpl.searchID(id);
+        if(playingSong == -1)
+            return;
+        Call<DataAndCode> call = CloudMusicApiImpl.searchID(playList.get(playingSong).getId());
         call.enqueue(new Callback<DataAndCode>() {
             @Override
             public void onResponse(Call<DataAndCode> call, Response<DataAndCode> resp) {
@@ -163,5 +179,9 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
 
     public boolean isPlaying(){
         return mPlayer.isPlaying();
+    }
+
+    public List<Song> getPlayList() {
+        return playList;
     }
 }

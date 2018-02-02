@@ -7,20 +7,25 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.database.Cursor;
-import android.media.MediaPlayer;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.support.annotation.RequiresApi;
 import android.support.v7.app.AppCompatActivity;
+import android.util.DisplayMetrics;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ListView;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import com.squareup.picasso.Picasso;
@@ -40,7 +45,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
 import java.util.List;
 
 import okhttp3.ResponseBody;
@@ -48,13 +52,12 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-import static android.os.Looper.prepare;
-import static com.xing.cloudmusic.R.mipmap.pause_btn;
-
 public class MainActivity extends AppCompatActivity implements AdapterView.OnItemClickListener, ServiceConnection {
     private EditText s;
     private ListView show;
     private Button playAndPause;
+    private RelativeLayout bottom;
+    private GestureDetector myGD;
 
     private CmAdapter adapter;
     private ImageView bottomImage;
@@ -80,6 +83,19 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         bottomImage = findViewById(R.id.bottom_image);
         bottmText1 = findViewById(R.id.bottom_text1);
         bottmText2 = findViewById(R.id.bottom_text2);
+        bottom = findViewById(R.id.bottom);
+
+        myGD = new GestureDetector(this,new CloudMusicGestureDetector());
+
+
+        bottom.setClickable(true);
+        bottom.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                myGD.onTouchEvent(event);
+                return true;
+            }
+        });
     }
 
 
@@ -103,19 +119,23 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         public void handleMessage(Message msg) {
             switch (msg.what){
                 case SEARCHS_BACK:
+                    //查询searchS返回
                     LogUtil.LogE("handler SEARCHS_BACK");
                     adapter = new CmAdapter(MainActivity.this,(ResultAndCode) msg.obj);
                     show.setAdapter(adapter);
                     break;
                 case SEARCHID_BACK:
+                    //查询searchID返回
                     LogUtil.LogE("handler SEARCHID_BACK");
                     DataAndCode adc = (DataAndCode) msg.obj;
                     mBinder.setAction(MusicPlayService.ACTION_PLAY,adc.getDataUrl());
                     break;
                 case DOWNLOADMUSIC:
+                    //下载完成
                     ToastFactory.show(MainActivity.this,"Download Finish!");
                     break;
                 case UPDATE_BOTTOM:
+                    //更新播放按钮图标，并且加载当前播放歌曲的信息
                     playAndPause.setBackgroundResource(R.mipmap.pause_btn);
                     Song song = (Song) msg.obj;
                     Picasso.with(MainActivity.this)
@@ -261,6 +281,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }
     }
 
+    //播放按钮点击事件
     public void playAndPause(View view){
         if(mBinder.getService().isPlaying()){
             mBinder.setAction(MusicPlayService.ACTION_PAUSE,null);
@@ -271,4 +292,26 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }
     }
 
+    //列表按钮点击时间
+    public void showPlayList(View view){
+        List<Song> playList = mBinder.getService().getPlayList();
+        //dosth
+    }
+
+    //处理bottom控件的滑动事件
+    class CloudMusicGestureDetector extends GestureDetector.SimpleOnGestureListener{
+        @Override
+        public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+            DisplayMetrics dm = new DisplayMetrics();
+            MainActivity.this.getWindowManager().getDefaultDisplay().getMetrics(dm);
+            if(e2.getX() - e1.getX() > dm.widthPixels/4){
+                //next song
+                mBinder.setAction(MusicPlayService.ACTION_NEXT,null);
+            }else if(e1.getX() - e2.getX() > dm.widthPixels/4){
+                //last song
+                mBinder.setAction(MusicPlayService.ACTION_LAST,null);
+            }
+            return super.onFling(e1, e2, velocityX, velocityY);
+        }
+    }
 }

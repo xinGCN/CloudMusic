@@ -30,6 +30,7 @@
         android:layout_below="@id/top"/>
 
 
+
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -81,7 +82,8 @@
             android:layout_height="40dp"
             android:id="@+id/musicList"
             android:layout_alignParentRight="true"
-            android:background="@mipmap/playerlist"/>
+            android:background="@mipmap/playerlist"
+            android:onClick="showPlayList"/>
     </RelativeLayout>
 
 </RelativeLayout>
