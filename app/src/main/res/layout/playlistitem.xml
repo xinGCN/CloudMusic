@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+
+
+    <TextView
+        android:id="@+id/item_text1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginLeft="5dp"
+        android:singleLine="true"
+        android:maxEms="8"
+        android:ellipsize="end"
+        android:textSize="20dp"
+        android:text="TextView12345678910111213141516" />
+
+    <TextView
+        android:id="@+id/item_text2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBottom="@+id/item_text1"
+        android:layout_toEndOf="@+id/item_text1"
+        android:layout_marginLeft="5dp"
+        android:singleLine="true"
+        android:maxEms="8"
+        android:ellipsize="end"
+        android:layout_alignBaseline="@id/item_text1"
+        android:layout_alignParentBottom="true"
+        android:textSize="10dp"
+        android:text="TextView" />
+
+    <ImageButton
+        android:id="@+id/downloadItem"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBottom="@id/item_text1"
+        android:layout_margin="5dp"
+        android:src="@mipmap/music_btn_download"
+        android:layout_toStartOf="@id/deleteItem"
+        android:background="#00000000"/>
+
+    <ImageButton
+        android:id="@+id/deleteItem"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:layout_alignBottom="@id/item_text1"
+        android:layout_margin="5dp"
+        android:src="@mipmap/list_icn_delete"
+        android:background="#00000000"/>
+</RelativeLayout>

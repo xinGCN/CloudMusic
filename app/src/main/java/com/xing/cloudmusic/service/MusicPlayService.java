@@ -16,6 +16,8 @@ import com.xing.cloudmusic.base.DataAndCode;
 import com.xing.cloudmusic.base.Song;
 import com.xing.cloudmusic.http.CloudMusicApiImpl;
 import com.xing.cloudmusic.util.LogUtil;
+import com.xing.cloudmusic.util.PlayListLocalManager;
+import com.xing.cloudmusic.util.ToastFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -37,6 +39,7 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
     public static final int ACTION_PLAY_FROMPAUSE = 20005;
     public static final int ACTION_NEXT = 20006;
     public static final int ACTION_LAST = 20007;
+    public static final int DEAL_DIALOG_ACITON_PLAY = 20008;
 
     private MediaPlayer mPlayer;
     private List<Song> playList;
@@ -45,6 +48,9 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
 
     private WifiManager.WifiLock wifiLock;
     private Handler mHandler;
+
+    //缓存音乐信息在本地
+    private PlayListLocalManager manager;
 
     @Nullable
     @Override
@@ -72,7 +78,8 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
                 .createWifiLock(WifiManager.WIFI_MODE_FULL, "cloudmusic lock");
         wifiLock.acquire();
 
-        playList = new ArrayList<>();
+        manager = PlayListLocalManager.getInstance(this);
+        playList = manager.readAll();
         playingSong = -1;
         LogUtil.LogE("MusicPlayService onCreate end");
     }
@@ -110,10 +117,15 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
         searchForPlay();
     }
 
+
+    //因为需要playingSong始终指向正在播放歌曲的index所以需要仔细考虑playingSong的校正问题;
     public class Binder extends android.os.Binder{
         public void setAction(int action,Object obj){
             switch (action){
                 case ACTION_PLAY:
+                    //当没有正在播放的歌曲而点击播放按钮的情况下，自动校正为当前播放歌曲为歌单第一首
+                    if(playingSong == -1&&playList.size() > 0);
+                    playingSong = 0;
                     searchForPlay();
                     break;
                 case ACTION_PAUSE:
@@ -122,6 +134,7 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
                 case PLAYLIST_ADD:
                     playList.add((Song)obj);
                     playingSong  = playList.size() - 1;
+                    manager.save((Song)obj);
                     break;
                 case ACTION_PLAY_FROMPAUSE:
                     mPlayer.start();
@@ -134,9 +147,27 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
                     break;
                 case ACTION_LAST:
                     if(playingSong != -1){
-                        playingSong = playingSong==0?playList.size()-0:playingSong-1;
+                        playingSong = playingSong==0?playList.size()-1:playingSong-1;
                         searchForPlay();
                     }
+                    break;
+                case PLAYLIST_DELETE:
+                    for (Song song: playList) {
+                        if(song.getId().equals ((String)obj)){
+                            playList.remove(song);
+                            break;
+                        }
+                    }
+                    manager.remove((String) obj);
+                    break;
+                case DEAL_DIALOG_ACITON_PLAY:
+                    for (Song song: playList) {
+                        if(song.getId().equals((String)obj)){
+                            playingSong = playList.indexOf(song);
+                            break;
+                        }
+                    }
+                    searchForPlay();
                     break;
             }
         }

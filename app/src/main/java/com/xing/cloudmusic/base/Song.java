@@ -3,7 +3,7 @@ package com.xing.cloudmusic.base;
 import java.util.List;
 
 /**
- * Created by Administrator on 2018/1/17 0017.
+ * Created by xinG on 2018/1/17 0017.
  */
 
 public class Song {

@@ -35,7 +35,8 @@ public class CmAdapter extends BaseAdapter {
 
     @Override
     public int getCount() {
-        return songs.size();
+        if(songs != null) return songs.size();
+        return 0;
     }
 
     @Override

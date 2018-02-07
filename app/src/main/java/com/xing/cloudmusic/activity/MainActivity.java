@@ -31,9 +31,11 @@ import android.widget.TextView;
 import com.squareup.picasso.Picasso;
 import com.xing.cloudmusic.R;
 import com.xing.cloudmusic.adapter.CmAdapter;
+import com.xing.cloudmusic.adapter.PlayListAdapter;
 import com.xing.cloudmusic.base.DataAndCode;
 import com.xing.cloudmusic.base.ResultAndCode;
 import com.xing.cloudmusic.base.Song;
+import com.xing.cloudmusic.dialog.PlayListDialog;
 import com.xing.cloudmusic.http.CloudMusicApiImpl;
 import com.xing.cloudmusic.service.MusicPlayService;
 import com.xing.cloudmusic.util.LogUtil;
@@ -45,6 +47,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.List;
 
 import okhttp3.ResponseBody;
@@ -64,10 +67,14 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private TextView bottmText1;
     private TextView bottmText2;
 
+    private PlayListDialog plDialog;
+
     private static final int SEARCHS_BACK = 10000;
     private static final int SEARCHID_BACK = 10001;
     private static final int DOWNLOADMUSIC = 10002;
     public static final int UPDATE_BOTTOM = 10003;
+    public static final int DELETE_PLAYLISTITEM = 10004;
+    public static final int DIALOG_ACTION_PLAY = 10005;
 
     private MusicPlayService.Binder mBinder;
     private Intent musicPlayService;
@@ -96,6 +103,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 return true;
             }
         });
+
+        plDialog = new PlayListDialog(MainActivity.this,mHandler);
     }
 
 
@@ -144,6 +153,14 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     bottmText1.setText(song.getName());
                     bottmText2.setText(song.getArtistName());
                     break;
+                case DELETE_PLAYLISTITEM:
+                    mBinder.setAction(MusicPlayService.PLAYLIST_DELETE,msg.obj);
+                    plDialog.invalidate();
+                    break;
+                case DIALOG_ACTION_PLAY:
+                    mBinder.setAction(MusicPlayService.DEAL_DIALOG_ACITON_PLAY,msg.obj);
+                    break;
+
             }
         }
     };
@@ -292,10 +309,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }
     }
 
-    //列表按钮点击时间
+    //列表按钮点击事件
     public void showPlayList(View view){
         List<Song> playList = mBinder.getService().getPlayList();
-        //dosth
+//        List<Song> playList = new ArrayList<>();
+//        playList.add(new Song("song1","",null,null));
+//        playList.add(new Song("song2","",null,null));
+        plDialog.setAdapter(playList);
+        plDialog.show();
+
     }
 
     //处理bottom控件的滑动事件
