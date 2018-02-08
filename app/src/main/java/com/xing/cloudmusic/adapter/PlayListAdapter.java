@@ -61,21 +61,10 @@ public class PlayListAdapter extends BaseAdapter {
             holder.text1 = convertView.findViewById(R.id.item_text1);
             holder.text2 = convertView.findViewById(R.id.item_text2);
             holder.delete = convertView.findViewById(R.id.deleteItem);
-            RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) holder.delete.getLayoutParams();
-//            params.width = params.height  ;//设置当前控件布局的高度
-            LogUtil.LogE("width : " + params.width + " height : " + params.height);
-//            holder.delete.setLayoutParams(params);
+            holder.download = convertView.findViewById(R.id.downloadItem);
             convertView.setTag(holder);
         }else
             holder = (ViewHolder) convertView.getTag();
-
-//        DisplayMetrics dm = context.getResources().getDisplayMetrics();
-//        int width = dm.widthPixels;
-//        int height = dm.heightPixels;
-//        final ViewGroup.LayoutParams params = convertView.getLayoutParams();
-//        params.height=height/2;//设置当前控件布局的高度
-//        params.width = width;
-//        convertView.setLayoutParams(params);//将设置好的布局参数应用到控件中
 
         final Song song = songs.get(position);
         holder.text1.setText(song.getName());
@@ -95,6 +84,13 @@ public class PlayListAdapter extends BaseAdapter {
                     mHandler.obtainMessage(MainActivity.DIALOG_ACTION_PLAY,song.getId()).sendToTarget();
             }
         });
+        holder.download.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(mHandler != null)
+                    mHandler.obtainMessage(MainActivity.DIALOG_DOWNLOAD_MUSIC,song).sendToTarget();
+            }
+        });
 
 
         return convertView;
@@ -105,5 +101,6 @@ public class PlayListAdapter extends BaseAdapter {
         TextView text1;
         TextView text2;
         ImageButton delete;
+        ImageButton download;
     }
 }

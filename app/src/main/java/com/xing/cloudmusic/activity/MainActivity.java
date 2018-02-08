@@ -14,6 +14,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.provider.MediaStore;
 import android.support.annotation.RequiresApi;
 import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
@@ -32,6 +33,7 @@ import com.squareup.picasso.Picasso;
 import com.xing.cloudmusic.R;
 import com.xing.cloudmusic.adapter.CmAdapter;
 import com.xing.cloudmusic.adapter.PlayListAdapter;
+import com.xing.cloudmusic.base.Data;
 import com.xing.cloudmusic.base.DataAndCode;
 import com.xing.cloudmusic.base.ResultAndCode;
 import com.xing.cloudmusic.base.Song;
@@ -71,10 +73,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
     private static final int SEARCHS_BACK = 10000;
     private static final int SEARCHID_BACK = 10001;
-    private static final int DOWNLOADMUSIC = 10002;
-    public static final int UPDATE_BOTTOM = 10003;
-    public static final int DELETE_PLAYLISTITEM = 10004;
-    public static final int DIALOG_ACTION_PLAY = 10005;
+    private static final int GO_DOWNLOAD = 10002;
+    public static final int DIALOG_DOWNLOAD_MUSIC = 10003;
+    public static final int UPDATE_BOTTOM = 10004;
+    public static final int DELETE_PLAYLISTITEM = 10005;
+    public static final int DIALOG_ACTION_PLAY = 10006;
 
     private MusicPlayService.Binder mBinder;
     private Intent musicPlayService;
@@ -139,9 +142,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     DataAndCode adc = (DataAndCode) msg.obj;
                     mBinder.setAction(MusicPlayService.ACTION_PLAY,adc.getDataUrl());
                     break;
-                case DOWNLOADMUSIC:
+                case DIALOG_DOWNLOAD_MUSIC:
                     //下载完成
-                    ToastFactory.show(MainActivity.this,"Download Finish!");
+                    Song s = (Song)msg.obj;
+                    searchIDForDownload(s.getId(),s.getArtistName() + " - " + s.getName());
                     break;
                 case UPDATE_BOTTOM:
                     //更新播放按钮图标，并且加载当前播放歌曲的信息
@@ -160,7 +164,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 case DIALOG_ACTION_PLAY:
                     mBinder.setAction(MusicPlayService.DEAL_DIALOG_ACITON_PLAY,msg.obj);
                     break;
-
             }
         }
     };
@@ -193,13 +196,13 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     }
 
     //查询某个id的歌曲，最重要为获得歌曲地址
-    private void searchID(String id){
+    private void searchIDForDownload(String id, final String name){
         LogUtil.LogE("searchID begin");
         Call<DataAndCode> call = CloudMusicApiImpl.searchID(id);
         call.enqueue(new Callback<DataAndCode>() {
             @Override
             public void onResponse(Call<DataAndCode> call, Response<DataAndCode> resp) {
-                mHandler.obtainMessage(SEARCHID_BACK,resp.body()).sendToTarget();
+                downloadFile(resp.body().getDataUrl(),name + "." +resp.body().getDataType());
                 LogUtil.LogE("searchID response : " + resp.body());
             }
 
@@ -219,7 +222,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             public void onResponse(Call<ResponseBody> call, Response<ResponseBody> resp) {
                 LogUtil.LogE("on Response start");
                 try {
-                    File file = new File(Environment.getExternalStorageDirectory()+"/"+name);
+                    File file = new File(Environment.getExternalStorageDirectory()+"/xinGCloudMusic/"+name);
 
                     OutputStream os = new FileOutputStream(file);
                     InputStream is = resp.body().byteStream();
@@ -230,9 +233,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                     is.close();
                     os.close();
-
-                    mHandler.obtainMessage(DOWNLOADMUSIC).sendToTarget();
                     LogUtil.LogE("download end");
+                    ToastFactory.show(MainActivity.this,"download finish");
                 } catch (FileNotFoundException e) {
                     e.printStackTrace();
                     LogUtil.LogE("file not found" + e.getMessage());
@@ -281,19 +283,23 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     public void test(View view){
         ContentResolver contentResolver = getContentResolver();
         Uri uri = android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
-        Cursor cursor = contentResolver.query(uri, null, null, null, null);
+        Cursor cursor = contentResolver.query(uri, null, null, null, MediaStore.Audio.Media.DEFAULT_SORT_ORDER);
         if (cursor == null) {
             // query failed, handle error.
         } else if (!cursor.moveToFirst()) {
             // no media on the device
         } else {
-            int titleColumn = cursor.getColumnIndex(android.provider.MediaStore.Audio.Media.TITLE);
-            int idColumn = cursor.getColumnIndex(android.provider.MediaStore.Audio.Media._ID);
+            int titleColumn = cursor.getColumnIndex(android.provider.MediaStore.Audio.Media.TITLE);//音乐标题
+            int idColumn = cursor.getColumnIndex(android.provider.MediaStore.Audio.Media._ID);//音乐id
+            int dataColumn = cursor.getColumnIndex(MediaStore.Audio.Media.DATA);//文件路径
+            int isMusic = cursor.getColumnIndex(MediaStore.Audio.Media.IS_MUSIC); // 是否为音乐
             do {
                 long thisId = cursor.getLong(idColumn);
                 String thisTitle = cursor.getString(titleColumn);
+                String thisData = cursor.getString(dataColumn);
+                int thisIsMusic = cursor.getInt(isMusic);
                 // ...process entry...
-                LogUtil.LogE(thisId + " " + thisTitle);
+                LogUtil.LogE(thisId + " " + thisTitle + " " + thisIsMusic + " "  + thisData);
             } while (cursor.moveToNext());
         }
     }
@@ -312,9 +318,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     //列表按钮点击事件
     public void showPlayList(View view){
         List<Song> playList = mBinder.getService().getPlayList();
-//        List<Song> playList = new ArrayList<>();
-//        playList.add(new Song("song1","",null,null));
-//        playList.add(new Song("song2","",null,null));
         plDialog.setAdapter(playList);
         plDialog.show();
 
@@ -336,4 +339,5 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             return super.onFling(e1, e2, velocityX, velocityY);
         }
     }
+
 }

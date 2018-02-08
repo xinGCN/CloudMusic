@@ -113,10 +113,12 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
 
     @Override
     public void onCompletion(MediaPlayer mp) {
-        if(playingSong == playList.size() - 1)  playingSong = 0;
-        searchForPlay();
+        //if(playingSong == playList.size() - 1)  playingSong = 0;
+        if(playingSong != -1){
+            playingSong = playingSong==playList.size()-1?0:playingSong+1;
+            searchForPlay();
+        }
     }
-
 
     //因为需要playingSong始终指向正在播放歌曲的index所以需要仔细考虑playingSong的校正问题;
     public class Binder extends android.os.Binder{
@@ -124,8 +126,6 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
             switch (action){
                 case ACTION_PLAY:
                     //当没有正在播放的歌曲而点击播放按钮的情况下，自动校正为当前播放歌曲为歌单第一首
-                    if(playingSong == -1&&playList.size() > 0);
-                    playingSong = 0;
                     searchForPlay();
                     break;
                 case ACTION_PAUSE:
@@ -137,6 +137,10 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
                     manager.save((Song)obj);
                     break;
                 case ACTION_PLAY_FROMPAUSE:
+                    if(playingSong == -1&&playList.size() > 0){
+                        playingSong = 0;
+                        searchForPlay();
+                    }
                     mPlayer.start();
                     break;
                 case ACTION_NEXT:
