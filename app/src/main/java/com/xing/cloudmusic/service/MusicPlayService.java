@@ -40,6 +40,7 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
     public static final int ACTION_NEXT = 20006;
     public static final int ACTION_LAST = 20007;
     public static final int DEAL_DIALOG_ACITON_PLAY = 20008;
+    public static final int DOWNLOAD_FINISH = 20009;
 
     private MediaPlayer mPlayer;
     private List<Song> playList;
@@ -56,6 +57,7 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
     @Override
     public IBinder onBind(Intent intent) {
         LogUtil.LogE("MusicPlayService onBind");
+        
         return new Binder();
     }
 
@@ -80,6 +82,7 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
 
         manager = PlayListLocalManager.getInstance(this);
         playList = manager.readAll();
+        LogUtil.LogE("playlist init : " + playList.toString());
         playingSong = -1;
         LogUtil.LogE("MusicPlayService onCreate end");
     }
@@ -156,6 +159,7 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
                     }
                     break;
                 case PLAYLIST_DELETE:
+                    LogUtil.LogE("do delete : " + (String)obj);
                     for (Song song: playList) {
                         if(song.getId().equals ((String)obj)){
                             playList.remove(song);
@@ -173,6 +177,17 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
                     }
                     searchForPlay();
                     break;
+                case DOWNLOAD_FINISH:
+                    //传来的数据格式为 "&id+&address"
+                    String data = (String )obj;
+                    for (Song song:playList) {
+                        if(song.getId().equals(data.substring(0,data.indexOf("+")))){
+                            song.setAddress(data.substring(data.indexOf("+") + 1));
+                            break;
+                        }
+                    }
+                   //LogUtil.LogE("id : " + data.substring(0,data.indexOf("+")) + " address : " + data.substring(data.indexOf("+") + 1));
+                    break;
             }
         }
 
@@ -186,30 +201,41 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
     }
 
     //查询某个id的歌曲，最重要为获得歌曲地址
-    private void searchForPlay(){
+    private void searchForPlay() {
         LogUtil.LogE("searchID begin");
-        if(playingSong == -1)
+        if (playingSong == -1)
             return;
-        Call<DataAndCode> call = CloudMusicApiImpl.searchID(playList.get(playingSong).getId());
-        call.enqueue(new Callback<DataAndCode>() {
-            @Override
-            public void onResponse(Call<DataAndCode> call, Response<DataAndCode> resp) {
-                try {
-                    mPlayer.reset();
-                    mPlayer.setDataSource(resp.body().getDataUrl());
-                    mPlayer.prepareAsync();
-                } catch (IOException e) {
-                    e.printStackTrace();
+        //本地歌曲播放
+        if (playList.get(playingSong).getAddress() != null ) {
+            try {
+                mPlayer.reset();
+                mPlayer.setDataSource(playList.get(playingSong).getAddress());
+                mPlayer.prepareAsync();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else { //在线歌曲播放
+            Call<DataAndCode> call = CloudMusicApiImpl.searchID(playList.get(playingSong).getId());
+            call.enqueue(new Callback<DataAndCode>() {
+                @Override
+                public void onResponse(Call<DataAndCode> call, Response<DataAndCode> resp) {
+                    try {
+                        mPlayer.reset();
+                        mPlayer.setDataSource(resp.body().getDataUrl());
+                        mPlayer.prepareAsync();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    LogUtil.LogE("searchID response : " + resp.body());
                 }
-                LogUtil.LogE("searchID response : " + resp.body());
-            }
 
-            @Override
-            public void onFailure(Call<DataAndCode> call, Throwable t) {
-                LogUtil.LogE("searchID fail : " + t.getMessage());
-            }
-        });
-        LogUtil.LogE("searchID end");
+                @Override
+                public void onFailure(Call<DataAndCode> call, Throwable t) {
+                    LogUtil.LogE("searchID fail : " + t.getMessage());
+                }
+            });
+            LogUtil.LogE("searchID end");
+        }
     }
 
     public boolean isPlaying(){

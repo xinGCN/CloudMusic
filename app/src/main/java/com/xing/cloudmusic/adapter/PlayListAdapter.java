@@ -92,7 +92,6 @@ public class PlayListAdapter extends BaseAdapter {
             }
         });
 
-
         return convertView;
     }
 

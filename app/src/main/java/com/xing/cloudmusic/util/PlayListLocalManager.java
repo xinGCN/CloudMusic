@@ -51,12 +51,18 @@ public class PlayListLocalManager {
         return songs;
     }
 
+    public Song read(String id){
+        Gson gson = new Gson();
+        return gson.fromJson(preferences.getString(id,"hehe"),Song.class);
+    }
+
     private boolean contain(Song song){
         return preferences.getString(song.getId(),null)!=null;
     }
 
     public void remove(String songId){
         editor.remove(songId);
+        editor.commit();
     }
 
 }

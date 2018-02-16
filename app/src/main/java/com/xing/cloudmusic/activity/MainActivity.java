@@ -8,16 +8,16 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.database.Cursor;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.os.Parcelable;
 import android.provider.MediaStore;
-import android.support.annotation.RequiresApi;
 import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
@@ -32,15 +32,15 @@ import android.widget.TextView;
 import com.squareup.picasso.Picasso;
 import com.xing.cloudmusic.R;
 import com.xing.cloudmusic.adapter.CmAdapter;
-import com.xing.cloudmusic.adapter.PlayListAdapter;
-import com.xing.cloudmusic.base.Data;
 import com.xing.cloudmusic.base.DataAndCode;
+import com.xing.cloudmusic.base.LocalSong;
 import com.xing.cloudmusic.base.ResultAndCode;
 import com.xing.cloudmusic.base.Song;
-import com.xing.cloudmusic.dialog.PlayListDialog;
+import com.xing.cloudmusic.customcontrol.PlayListDialog;
 import com.xing.cloudmusic.http.CloudMusicApiImpl;
 import com.xing.cloudmusic.service.MusicPlayService;
 import com.xing.cloudmusic.util.LogUtil;
+import com.xing.cloudmusic.util.PlayListLocalManager;
 import com.xing.cloudmusic.util.ToastFactory;
 
 import java.io.File;
@@ -78,6 +78,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     public static final int UPDATE_BOTTOM = 10004;
     public static final int DELETE_PLAYLISTITEM = 10005;
     public static final int DIALOG_ACTION_PLAY = 10006;
+    public static final int DIALOG_START_LOCALACTIVITY = 10007;
 
     private MusicPlayService.Binder mBinder;
     private Intent musicPlayService;
@@ -108,6 +109,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         });
 
         plDialog = new PlayListDialog(MainActivity.this,mHandler);
+
     }
 
 
@@ -145,7 +147,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 case DIALOG_DOWNLOAD_MUSIC:
                     //下载完成
                     Song s = (Song)msg.obj;
-                    searchIDForDownload(s.getId(),s.getArtistName() + " - " + s.getName());
+                    if(s.getAddress() != null)
+                        ToastFactory.show(MainActivity.this,"该歌曲为本地歌曲。");
+                    else
+                        searchIDForDownload(s.getId(),s.getArtistName() + " - " + s.getName());
                     break;
                 case UPDATE_BOTTOM:
                     //更新播放按钮图标，并且加载当前播放歌曲的信息
@@ -163,6 +168,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     break;
                 case DIALOG_ACTION_PLAY:
                     mBinder.setAction(MusicPlayService.DEAL_DIALOG_ACITON_PLAY,msg.obj);
+                    break;
+                case DIALOG_START_LOCALACTIVITY:
+                    Intent intent = new Intent(MainActivity.this,LocalSongActivity.class);
+                    startActivityForResult(intent,1);
                     break;
             }
         }
@@ -196,13 +205,14 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     }
 
     //查询某个id的歌曲，最重要为获得歌曲地址
-    private void searchIDForDownload(String id, final String name){
+    private void searchIDForDownload(final String id, final String name){
         LogUtil.LogE("searchID begin");
+        ToastFactory.show(MainActivity.this,"下载开始，不要瞎鸡巴多按很多次！");
         Call<DataAndCode> call = CloudMusicApiImpl.searchID(id);
         call.enqueue(new Callback<DataAndCode>() {
             @Override
             public void onResponse(Call<DataAndCode> call, Response<DataAndCode> resp) {
-                downloadFile(resp.body().getDataUrl(),name + "." +resp.body().getDataType());
+                downloadFile(resp.body().getDataUrl(),name + "." +resp.body().getDataType(),id);
                 LogUtil.LogE("searchID response : " + resp.body());
             }
 
@@ -214,7 +224,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         LogUtil.LogE("searchID end");
     }
 
-    private void downloadFile(String url, final String name){
+    private void downloadFile(String url, final String name, final String id){
         LogUtil.LogE("download begin");
         Call<ResponseBody> call = CloudMusicApiImpl.downloadFile(url);
         call.enqueue(new Callback<ResponseBody>() {
@@ -222,8 +232,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             public void onResponse(Call<ResponseBody> call, Response<ResponseBody> resp) {
                 LogUtil.LogE("on Response start");
                 try {
-                    File file = new File(Environment.getExternalStorageDirectory()+"/xinGCloudMusic/"+name);
-
+                    File path = new File(Environment.getExternalStorageDirectory()+"/xinGCloudMusic/");
+                    if(!path.exists())
+                        path.mkdirs();
+                    File file = new File(Environment.getExternalStorageDirectory()+"/xinGCloudMusic/" + name);
                     OutputStream os = new FileOutputStream(file);
                     InputStream is = resp.body().byteStream();
                     byte[] bytes = new byte[1024];
@@ -233,6 +245,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                     is.close();
                     os.close();
+                    mBinder.setAction(MusicPlayService.DOWNLOAD_FINISH,id + "+"+file.getPath());
                     LogUtil.LogE("download end");
                     ToastFactory.show(MainActivity.this,"download finish");
                 } catch (FileNotFoundException e) {
@@ -281,27 +294,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     }
 
     public void test(View view){
-        ContentResolver contentResolver = getContentResolver();
-        Uri uri = android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
-        Cursor cursor = contentResolver.query(uri, null, null, null, MediaStore.Audio.Media.DEFAULT_SORT_ORDER);
-        if (cursor == null) {
-            // query failed, handle error.
-        } else if (!cursor.moveToFirst()) {
-            // no media on the device
-        } else {
-            int titleColumn = cursor.getColumnIndex(android.provider.MediaStore.Audio.Media.TITLE);//音乐标题
-            int idColumn = cursor.getColumnIndex(android.provider.MediaStore.Audio.Media._ID);//音乐id
-            int dataColumn = cursor.getColumnIndex(MediaStore.Audio.Media.DATA);//文件路径
-            int isMusic = cursor.getColumnIndex(MediaStore.Audio.Media.IS_MUSIC); // 是否为音乐
-            do {
-                long thisId = cursor.getLong(idColumn);
-                String thisTitle = cursor.getString(titleColumn);
-                String thisData = cursor.getString(dataColumn);
-                int thisIsMusic = cursor.getInt(isMusic);
-                // ...process entry...
-                LogUtil.LogE(thisId + " " + thisTitle + " " + thisIsMusic + " "  + thisData);
-            } while (cursor.moveToNext());
-        }
+        LocalSong ls = new LocalSong("id","name","address","artistname","albumName","albumPicUrl");
+        LogUtil.LogE("1 : "+ls.toSong().toString());
+
+        mBinder.setAction(MusicPlayService.PLAYLIST_ADD,ls.toSong());
     }
 
     //播放按钮点击事件
@@ -340,4 +336,16 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }
     }
 
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if(requestCode==1&&requestCode==1){
+            ArrayList<LocalSong> localSongs = data.getParcelableArrayListExtra(LocalSongActivity.key);
+            for (LocalSong l:localSongs) {
+                //把歌曲添加进播放列表
+                mBinder.setAction(MusicPlayService.PLAYLIST_ADD,l.toSong());
+            }
+        }
+        plDialog.invalidate();
+    }
 }

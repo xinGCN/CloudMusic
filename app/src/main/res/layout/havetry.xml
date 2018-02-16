@@ -18,9 +18,10 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="4dip"
             android:layout_weight="6"
-            android:onClick="test"
+            android:onClick="search"
             android:background="@mipmap/actionbar_search"/>
     </LinearLayout>
+<!-- search!-->
 
     <ListView
         android:id="@+id/listView"
