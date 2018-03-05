@@ -32,7 +32,7 @@ public class PlayListLocalManager {
     }
 
     public void save(Song song){
-        if(contain(song)) return;
+        //if(contain(song)) return;
         editor.putString(song.getId() ,new Gson().toJson(song));
         editor.commit();
     }

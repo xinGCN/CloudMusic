@@ -10,6 +10,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.support.annotation.Nullable;
+import android.widget.Toast;
 
 import com.xing.cloudmusic.activity.MainActivity;
 import com.xing.cloudmusic.base.DataAndCode;
@@ -19,10 +20,16 @@ import com.xing.cloudmusic.util.LogUtil;
 import com.xing.cloudmusic.util.PlayListLocalManager;
 import com.xing.cloudmusic.util.ToastFactory;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import okhttp3.ResponseBody;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -51,6 +58,8 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
     private Handler mHandler;
 
     //缓存音乐信息在本地
+    //之前想每次有小操作都在操作的时候定点更新本地数据，这么做是考虑到将信息存储全部放在软件开头和结尾当列表歌曲打到一定程度可能会耗时
+    //现在只感觉妈的真麻烦，事多。就一起存了。
     private PlayListLocalManager manager;
 
     @Nullable
@@ -85,11 +94,14 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
         LogUtil.LogE("playlist init : " + playList.toString());
         playingSong = -1;
         LogUtil.LogE("MusicPlayService onCreate end");
+
+        releaseCache();
     }
 
     @Override
     public void onDestroy() {
-        LogUtil.LogE("MusicPlayService onDestroy");
+        LogUtil.LogE("MusicPlayService onDestroy with playList" + playList.toString());
+        manager.saveAll(playList);
         if(mPlayer != null) mPlayer.release();
         if(wifiLock !=null) wifiLock.release();
     }
@@ -211,10 +223,13 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
                 mPlayer.reset();
                 mPlayer.setDataSource(playList.get(playingSong).getAddress());
                 mPlayer.prepareAsync();
+                ToastFactory.show(MusicPlayService.this,"local play");
             } catch (IOException e) {
+                //当歌曲被人为文件删除时，歌曲的地址默认还是为旧地址，所以出错时要给当前歌曲赋null
+                playList.get(playingSong).setAddress(null);
                 e.printStackTrace();
             }
-        } else { //在线歌曲播放
+        } else {    //在线歌曲在第一次播放时address为null，第一次播放会自动启动缓存将address赋值
             Call<DataAndCode> call = CloudMusicApiImpl.searchID(playList.get(playingSong).getId());
             call.enqueue(new Callback<DataAndCode>() {
                 @Override
@@ -223,18 +238,99 @@ public class MusicPlayService extends Service implements MediaPlayer.OnPreparedL
                         mPlayer.reset();
                         mPlayer.setDataSource(resp.body().getDataUrl());
                         mPlayer.prepareAsync();
+                        ToastFactory.show(MusicPlayService.this,"online play");
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
-                    LogUtil.LogE("searchID response : " + resp.body());
                 }
 
                 @Override
-                public void onFailure(Call<DataAndCode> call, Throwable t) {
-                    LogUtil.LogE("searchID fail : " + t.getMessage());
-                }
+                public void onFailure(Call<DataAndCode> call, Throwable t) {}
             });
-            LogUtil.LogE("searchID end");
+
+            Song nSong = playList.get(playingSong);
+            searchIDForCache(nSong.getId(),nSong.getArtistName()+" - " + nSong.getName());
+        }
+    }
+
+    //根据id缓存在线歌曲
+    private void searchIDForCache(final String id, final String name){
+        Call<DataAndCode> call = CloudMusicApiImpl.searchID(id);
+        call.enqueue(new Callback<DataAndCode>() {
+            @Override
+            public void onResponse(Call<DataAndCode> call, Response<DataAndCode> resp) {
+                cacheFile(resp.body().getDataUrl(),name + "." +resp.body().getDataType(),id);
+             }
+
+            @Override
+            public void onFailure(Call<DataAndCode> call, Throwable t) {}
+        });
+    }
+
+    private void cacheFile(String url, final String name, final String id){
+        Call<ResponseBody> call = CloudMusicApiImpl.downloadFile(url);
+        call.enqueue(new Callback<ResponseBody>() {
+            @Override
+            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> resp) {
+                try {
+                    File path = new File(Environment.getExternalStorageDirectory()+"/xinGCloudMusic/temp/");
+                    if(!path.exists())
+                        path.mkdirs();
+                    File file = new File(Environment.getExternalStorageDirectory()+"/xinGCloudMusic/temp/" + name);
+                    OutputStream os = new FileOutputStream(file);
+                    InputStream is = resp.body().byteStream();
+                    byte[] bytes = new byte[1024];
+                    int len;
+                    while(( len = is.read(bytes) )!= -1 )
+                        os.write(bytes,0,len);
+
+                    is.close();
+                    os.close();
+
+                    for (Song s:playList) {
+                        if(s.getId().equals(id)){
+                            s.setAddress(file.getPath());
+                            LogUtil.LogE("cache finsh with path : " + file.getPath());
+                            break;
+                        }
+                    }
+                 } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                 } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ResponseBody> call, Throwable t) {}
+        });
+    }
+
+
+
+    /**
+     * 检测缓存状况，按需清理
+     * 当缓存歌曲数量达到10首以上时循环删除最旧的歌曲指导只剩10首以下，删除歌曲之前需要将对应列表歌曲address设置为null
+     */
+    private void releaseCache(){
+        File path = new File(Environment.getExternalStorageDirectory()+"/xinGCloudMusic/temp/");
+        if(!path.exists())
+            path.mkdirs();
+        File[] files = path.listFiles();
+        if(files == null || files.length <= 0) return;
+        while(files.length > 10){
+            File oldest = files[0];
+            for (File file: files) {
+                if(oldest.lastModified() < file.lastModified())
+                    oldest = file;
+            }
+            for (Song s: playList) {
+                if(oldest.getName().contains(s.getName())&&oldest.getName().contains(s.getArtistName())){
+                    s.setAddress(null);
+                    LogUtil.LogE(s.getName() + " address set null");
+                }
+            }
+            oldest.delete();
         }
     }
 
